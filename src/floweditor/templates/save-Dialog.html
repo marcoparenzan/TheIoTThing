@@ -1,0 +1,19 @@
+<div class="dialog">
+  <div class="dialog-header">
+    <span>Save Flow</span>
+    <span class="dialog-close" data-close="saveDialog">&times;</span>
+  </div>
+  <div class="dialog-body">
+    <div class="property-row">
+      <label for="flowName">Flow Name</label>
+      <input type="text" id="flowName" />
+    </div>
+    <div class="property-row">
+      <textarea id="flowJSON" readonly class="code-editor"></textarea>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <button data-close="saveDialog">Close</button>
+    <button id="downloadBtn">Download JSON</button>
+  </div>
+</div>

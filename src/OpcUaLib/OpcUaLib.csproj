@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.5.375.457" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLib.Abstractions\FlowLib.Abstractions.csproj" />
+  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\FlowLib.Abstractions\FlowLib.Abstractions.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\FlowLib.Abstractions\FlowLib.Abstractions.csproj" />
+	</ItemGroup>
+
+</Project>

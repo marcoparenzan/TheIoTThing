@@ -1,0 +1,40 @@
+﻿@inject IJSRuntime jsRuntime
+@* @rendermode InteractiveServer *@
+
+<button type="button" class="btn btn-primary" @onclick="LoadWorkspace">Load</button>
+<button type="button" class="btn btn-primary" @onclick="SaveWorkspace">Save</button>
+<button type="button" class="btn btn-primary" @onclick="TranspileWorkspace">Transpile</button>
+
+@code {
+
+    [Parameter]
+    public string Workspace { get; set; }
+
+    async Task LoadWorkspace()
+    {
+        if (File.Exists("workspace.json"))
+        {
+            Workspace = await File.ReadAllTextAsync("workspace.json");
+        }
+        await jsRuntime.InvokeVoidAsync("LoadWorkspace", Workspace);
+    }
+
+    async Task SaveWorkspace()
+    {
+        Workspace = await jsRuntime.InvokeAsync<string>("SaveWorkspace");
+        await File.WriteAllTextAsync("workspace.json", Workspace);
+    }
+
+    async Task TranspileWorkspace()
+    {
+        try
+        {
+            var def = JsonSerializer.Deserialize<WorkspaceDef>(Workspace);
+            var json = JsonSerializer.Serialize(def);
+        }
+        catch (Exception ex)
+        {
+            
+        }
+    }
+}

@@ -1,0 +1,13 @@
+﻿@page "/flow"
+@inject IJSRuntime jsRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+<article class="content px-12">
+    <FlowCanvas @ref="editor"></FlowCanvas>
+</article>
+
+
+@code {
+    FlowCanvas editor;
+}

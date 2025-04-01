@@ -1,0 +1,50 @@
+﻿@using System.Text.Json
+@using Microsoft.JSInterop
+@using WorkspaceLib
+@using WorkspaceLib.Models
+
+@inject BlocklyLib.BlocklyJsInterop blocklyJs
+
+<div id="@ElName" style="height: 640px; width: 1280px;"></div>
+
+@code {
+
+    [Parameter]
+    public string State { get; set; }
+
+    [Parameter]
+    public string Name { get; set; }
+
+    string ElName => $"{Name}-el";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await blocklyJs.InitWorkspaceAsync(Name, ElName);
+            await blocklyJs.CreateVariableAsync(Name, "boiler1_CC1001");
+            await blocklyJs.CreateVariableAsync(Name, "boiler1_FC1001");
+        }
+    }
+
+    public async Task LoadWorkspaceAsync()
+    {
+        State = await File.ReadAllTextAsync($"workspace-{Name}.json");
+        await blocklyJs.LoadWorkspaceAsync(State);
+    }
+
+    public async Task SaveWorkspaceAsync()
+    {
+        State = await blocklyJs.SaveWorkspaceAsync();
+        await File.WriteAllTextAsync($"workspace-{Name}.json", State);
+    }
+
+    public async Task<string> TranspileWorkspace()
+    {
+        var def = JsonSerializer.Deserialize<WorkspaceDef>(State);
+        var tsp = new CSharpTranspiler();
+        var xx = tsp.Transpile(def);
+        var code = xx.ToFullString();
+        return code;
+    }
+}

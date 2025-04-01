@@ -1,0 +1,20 @@
+<div class="dialog">
+  <div class="dialog-header">
+    <span>Load Flow</span>
+    <span class="dialog-close" data-close="loadDialog">&times;</span>
+  </div>
+  <div class="dialog-body">
+    <div class="property-row">
+      <label for="loadFile">Select JSON File</label>
+      <input type="file" id="loadFile" accept=".json" />
+    </div>
+    <div class="property-row">
+      <p>Or paste JSON:</p>
+      <textarea id="loadJSON" class="code-editor"></textarea>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <button data-close="loadDialog">Cancel</button>
+    <button id="loadFlowBtn">Load</button>
+  </div>
+</div>

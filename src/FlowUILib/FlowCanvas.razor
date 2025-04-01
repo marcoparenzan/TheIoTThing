@@ -1,0 +1,27 @@
+﻿@using System.Text.Json
+@using Microsoft.JSInterop
+@using WorkspaceLib
+@using WorkspaceLib.Models
+
+@inject FlowUILib.FlowUIInterop flowUI
+
+<div id="@ElName" style="height: 640px; width: 1280px;"></div>
+
+@code {
+
+    [Parameter]
+    public string State { get; set; }
+
+    [Parameter]
+    public string Name { get; set; }
+
+    string ElName => $"{Name}-el";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await flowUI.InitFlowAsync(Name, ElName);
+        }
+    }
+}

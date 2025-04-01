@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flow Editor</title>
+
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="header">
+      <h1>Flow Editor</h1>
+      <div class="toolbar">
+        <button id="newBtn">New</button>
+        <button id="saveBtn">Save</button>
+        <button id="loadBtn">Load</button>
+        <button id="undoBtn">Undo</button>
+        <button id="redoBtn">Redo</button>
+        <button id="zoomInBtn">+</button>
+        <button id="zoomOutBtn">-</button>
+        <button id="zoomResetBtn">Reset</button>
+      </div>
+    </div>
+
+    <div class="main-container">
+      <div class="toolbox" id="toolbox">
+        <h3>Step Types</h3>
+        <div class="toolbox-item" data-type="timer" draggable="true">Timer</div>
+        <div class="toolbox-item" data-type="opcuasource" draggable="true">OPC/UA Source</div>
+        <div class="toolbox-item" data-type="processor" draggable="true">Processor</div>
+        <div class="toolbox-item" data-type="mqttsender" draggable="true">MQTT Sender</div>
+      </div>
+
+      <div class="canvas-container" id="canvasContainer">
+        <div id="canvas"></div>
+      </div>
+
+      <div class="property-panel" id="propertyPanel">
+        <div class="property-group">
+          <h3>Step Properties</h3>
+          <div class="property-row">
+            <label for="stepName">Name</label>
+            <input type="text" id="stepName" />
+          </div>
+          <div class="property-row">
+            <label for="stepColor">Color</label>
+            <input type="color" id="stepColor" />
+          </div>
+          <div class="property-row">
+            <label for="stepType">Type</label>
+            <input type="text" id="stepType" readonly />
+          </div>
+          <div class="property-row">
+            <button id="editScriptBtn">Edit Script</button>
+          </div>
+        </div>
+        <div class="property-group" id="customProperties">
+          <h3>Custom Properties</h3>
+          <div id="propertiesList"></div>
+          <button id="addPropertyBtn">Add Property</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/constants.js"></script>
+    <script src="js/history-manager.js"></script>
+    <script src="js/step.js"></script>
+    <script src="js/pipe.js"></script>
+    <script src="js/flow-editor.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

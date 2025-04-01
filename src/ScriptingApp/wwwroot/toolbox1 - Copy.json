@@ -1,0 +1,34 @@
+﻿{
+  "kind": "categoryToolbox",
+  "contents": [
+    {
+      "kind": "category",
+      "name": "OpcUa",
+      "categorystyle": "logic_category",
+      "contents": [
+        {
+          "type": "messagestatus",
+          "message0": "Power %1 Running %2",
+          "args0": [
+            {
+              "type": "input_value",
+              "name": "Power",
+              "check": "Boolean"
+            },
+            {
+              "type": "input_value",
+              "name": "Running",
+              "check": "Boolean"
+            }
+          ],
+          "inputsInline": false,
+          "previousStatement": null,
+          "nextStatement": null,
+          "colour": 330,
+          "tooltip": "MessageStatus",
+          "helpUrl": "https://fdddd.com/MessageStatus"
+        }
+      ]
+    }
+  ]
+}

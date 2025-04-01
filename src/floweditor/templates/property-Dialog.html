@@ -1,0 +1,33 @@
+<div class="dialog">
+  <div class="dialog-header">
+    <span>Add Property</span>
+    <span class="dialog-close" data-close="propertyDialog">&times;</span>
+  </div>
+  <div class="dialog-body">
+    <div class="property-row">
+      <label for="propertyName">Property Name</label>
+      <input type="text" id="propertyName" />
+    </div>
+    <div class="property-row">
+      <label for="propertyType">Property Type</label>
+      <select id="propertyType">
+        <option value="text">Text</option>
+        <option value="number">Number</option>
+        <option value="boolean">Boolean</option>
+        <option value="select">Select</option>
+      </select>
+    </div>
+    <div class="property-row" id="propertyOptionsRow" style="display: none">
+      <label for="propertyOptions">Options (comma separated)</label>
+      <input type="text" id="propertyOptions" />
+    </div>
+    <div class="property-row">
+      <label for="propertyDefault">Default Value</label>
+      <input type="text" id="propertyDefault" />
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <button data-close="propertyDialog">Cancel</button>
+    <button id="savePropertyBtn">Add</button>
+  </div>
+</div>

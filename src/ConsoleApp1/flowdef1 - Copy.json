@@ -1,0 +1,130 @@
+{
+  "steps": [
+    {
+      "id": "id_yu6u8hhdr",
+      "type": "timer",
+      "name": "Timer",
+      "x": 224,
+      "y": 114,
+      "width": 170,
+      "height": 266,
+      "color": "#3498db",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "id_au7li1fhb",
+          "name": "trigger"
+        }
+      ],
+      "properties": {
+        "intervalMilliseconds": 1000
+      },
+      "script": ""
+    },
+    {
+      "id": "id_veh6j3aer",
+      "type": "opcuasource",
+      "name": "Opcuasource",
+      "x": 517,
+      "y": 127,
+      "width": 152,
+      "height": 261,
+      "color": "#2ecc71",
+      "inputs": [
+        {
+          "id": "id_qkyi90lfg",
+          "name": "trigger"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "id_nltxrzgv8",
+          "name": "message"
+        }
+      ],
+      "properties": {
+        "sourceUri": "opc.tcp://localhost:4840",
+        "node_ids": [
+          "ns=1;s=Temperature"
+        ]
+      },
+      "script": ""
+    },
+    {
+      "id": "id_5rmyy8h9m",
+      "type": "processor",
+      "name": "Processor",
+      "x": 807,
+      "y": 132,
+      "width": 154,
+      "height": 256,
+      "color": "#f39c12",
+      "inputs": [
+        {
+          "id": "id_m1r72hg6p",
+          "name": "message-in"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "id_4ecp79sl4",
+          "name": "message-out"
+        }
+      ],
+      "properties": {},
+      "script": "sdffsfasfs"
+    },
+    {
+      "id": "id_4zmun4w4v",
+      "type": "mqttsender",
+      "name": "Mqttsender",
+      "x": 1136,
+      "y": 135,
+      "width": 156,
+      "height": 245,
+      "color": "#9b59b6",
+      "inputs": [
+        {
+          "id": "id_cgslpbwht",
+          "name": "message-in"
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "targetUri": "mqtt://localhost:1883",
+        "topic": "test/nodes"
+      },
+      "script": ""
+    }
+  ],
+  "pipes": [
+    {
+      "id": "id_hfasqi4ge",
+      "sourceStep": "id_yu6u8hhdr",
+      "sourceOutput": "id_au7li1fhb",
+      "targetStep": "id_veh6j3aer",
+      "targetInput": "id_qkyi90lfg",
+      "properties": {},
+      "color": "#666"
+    },
+    {
+      "id": "id_1lakfnw3a",
+      "sourceStep": "id_veh6j3aer",
+      "sourceOutput": "id_nltxrzgv8",
+      "targetStep": "id_5rmyy8h9m",
+      "targetInput": "id_m1r72hg6p",
+      "properties": {},
+      "color": "#666"
+    },
+    {
+      "id": "id_9fpnt8niu",
+      "sourceStep": "id_5rmyy8h9m",
+      "sourceOutput": "id_4ecp79sl4",
+      "targetStep": "id_4zmun4w4v",
+      "targetInput": "id_cgslpbwht",
+      "properties": {},
+      "color": "#666"
+    }
+  ],
+  "scale": 1
+}

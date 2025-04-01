@@ -1,0 +1,21 @@
+<div class="dialog">
+  <div class="dialog-header">
+    <span>Edit Script</span>
+    <span class="dialog-close" data-close="scriptDialog">&times;</span>
+  </div>
+  <div class="dialog-body">
+    <p>Define the script that processes inputs to generate outputs:</p>
+    <textarea class="code-editor" id="scriptEditor">
+// Example:
+// function process(inputs) {
+//     let result = inputs.value * 2;
+//     return { result: result };
+// }
+              </textarea
+    >
+  </div>
+  <div class="dialog-footer">
+    <button data-close="scriptDialog">Cancel</button>
+    <button id="saveScriptBtn">Save</button>
+  </div>
+</div>

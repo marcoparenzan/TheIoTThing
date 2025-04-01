@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="flowdef1 - Copy.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="flowdef1 - Copy.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="flowdef1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLib\FlowLib.csproj" />
+    <ProjectReference Include="..\MqttLib\MqttLib.csproj" />
+    <ProjectReference Include="..\OpcUaLib\OpcUaLib.csproj" />
+  </ItemGroup>
+
+</Project>

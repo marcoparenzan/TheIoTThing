@@ -1,0 +1,17 @@
+﻿@page "/transpile"
+
+<PageTitle>Home</PageTitle>
+
+@code {
+
+    async Task ClickAsync()
+    {
+        var json = await File.ReadAllTextAsync("workspace.json");
+        var def = JsonSerializer.Deserialize<WorkspaceDef>(json);
+
+        var evaluator = new CSharpTranspiler();
+        var codeBlock = evaluator.Transpile(def);
+
+        Console.WriteLine(codeBlock.ToFullString());
+    }
+}
