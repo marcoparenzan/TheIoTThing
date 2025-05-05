@@ -13,8 +13,7 @@ public class DeviceIoTHubService(IConfiguration config) : BackgroundService
     {
         var hashids = new HashidsNet.Hashids();
 
-        var hostname = config["HostName"];
-        //var hostname = "mpeg.swedencentral-1.ts.eventgrid.azure.net";
+        var hostName = config["HostName"];
 
         var customerName = config["CustomerName"];
         var deviceName = config["DeviceName"];
@@ -24,7 +23,8 @@ public class DeviceIoTHubService(IConfiguration config) : BackgroundService
         var certificatePassword = config["CertificatePassword"];
 
         var clientId = deviceName;
-        var username = clientId;
+        var resourceId = $"{hostName}/devices/{deviceName}";
+        var username = $"{hostName}/{deviceName}/api-version=2021-04-12";
 
         var mqttClient = new MqttFactory().CreateMqttClient();
 
@@ -35,16 +35,20 @@ public class DeviceIoTHubService(IConfiguration config) : BackgroundService
             var certificateBytes = await httpClient.GetByteArrayAsync(certificateUrl);
 
             var certificate = X509CertificateLoader.LoadPkcs12(certificateBytes, certificatePassword);
+            //var intermediate = X509CertificateLoader.LoadCertificateFromFile(@"D:\Downloads\27-IntermediateCACert.pem");
+            var root = X509CertificateLoader.LoadCertificateFromFile(@"D:\Downloads\31-RootCACert.pem");
 
             var opts = new MqttClientOptionsBuilder()
-                .WithTcpServer(hostname, 8883)
+                .WithTcpServer(hostName, 8883)
                 .WithClientId(clientId)
-                .WithCredentials(username, username)  //use client authentication name in the username
+                .WithCredentials(username, "")  //use client authentication name in the username
                 .WithTlsOptions(configure =>
                     configure
                         .UseTls()
+                        .WithSslProtocols(System.Security.Authentication.SslProtocols.Tls12)
                         .WithClientCertificates([certificate])
                 )
+                .WithCleanSession()
                 .Build();
 
             var connAck = await mqttClient!.ConnectAsync(opts);

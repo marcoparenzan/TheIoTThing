@@ -8,7 +8,7 @@
         "applicationUrl": "https://localhost:9172;http://localhost:9154",
         "environmentVariables": {
           "ASPNETCORE_ENVIRONMENT": "Development",
-          "TenantConfigurationFile": "D:\\Configurations\\TheThingsHub\\device12-dev.json"
+          "TenantConfigurationFile": "D:\\Configurations\\TheThingsHub\\device16-dev.json"
         }
       }
     }

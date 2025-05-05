@@ -41,8 +41,8 @@ if (!configurationReady)
 //builder.Services.AddScoped<BlocklyLib.BlocklyJsInterop>();
 //builder.Services.AddHostedService<OpcUaService>();
 
-//builder.Services.AddHostedService<TheIoTThingsApp.Services.DeviceEventGridService>();
-builder.Services.AddHostedService<TheIoTThingsApp.Services.DeviceIoTHubService>();
+builder.Services.AddHostedService<TheIoTThingsApp.Services.DeviceEventGridService>();
+//builder.Services.AddHostedService<TheIoTThingsApp.Services.DeviceIoTHubService>();
 
 builder.Services.AddMudServices();
 
