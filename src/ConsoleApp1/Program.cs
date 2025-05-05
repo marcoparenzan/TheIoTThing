@@ -31,7 +31,7 @@ var qot = new QuantumOfTime
 var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
 while (true)
 {
-    //await periodicTimer.WaitForNextTickAsync();
+    await periodicTimer.WaitForNextTickAsync();
 
     var stay = true;
     while(stay)
