@@ -1,103 +1,40 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-4">The IoT Thing</MudText>
-        <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End" />
-    </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+<div class="flex h-screen w-screen overflow-hidden bg-gray-900 text-gray-100 font-sans">
+    <aside class="@(_drawerOpen ? "w-56" : "w-0") transition-all duration-200 overflow-hidden bg-gray-950 border-r border-gray-800 shrink-0" style="background:#111827">
+        <div class="h-14 flex items-center px-4 border-b border-gray-800 whitespace-nowrap">
+            <span class="text-lg font-bold text-blue-400 mr-2">⬡</span>
+            <span class="text-sm font-bold tracking-wide text-gray-200">The IoT Thing</span>
+        </div>
         <NavMenu />
-    </MudDrawer>
-    <MudMainContent Class="mt-16 pa-4">
-        @Body
-    </MudMainContent>
-</MudLayout>
+    </aside>
 
+    <div class="flex flex-1 flex-col min-w-0">
+        <header class="h-14 flex items-center gap-3 px-4 bg-gray-800 border-b border-gray-700 shrink-0">
+            <button type="button" @onclick="DrawerToggle" class="p-2 rounded hover:bg-gray-700 transition text-gray-300" title="Menu">
+                ☰
+            </button>
+        </header>
 
-<div id="blazor-error-ui">
-    An unhandled error has occurred.
-    <a href="" class="reload">Reload</a>
-    <a class="dismiss">🗙</a>
+        <main class="flex-1 overflow-auto">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" class="hidden fixed bottom-0 inset-x-0 bg-red-900/90 text-red-100 text-sm px-4 py-3 flex items-center justify-between z-50">
+    <span>An unhandled error has occurred.</span>
+    <div class="flex items-center gap-3">
+        <a href="" class="underline">Reload</a>
+        <a class="cursor-pointer">🗙</a>
+    </div>
 </div>
 
 @code {
     private bool _drawerOpen = true;
-    private bool _isDarkMode = true;
-    private MudTheme? _theme = null;
-
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-
-        _theme = new()
-        {
-            PaletteLight = _lightPalette,
-            PaletteDark = _darkPalette,
-            LayoutProperties = new LayoutProperties()
-        };
-    }
-
 
     private void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;
     }
-
-    private void DarkModeToggle()
-    {
-        _isDarkMode = !_isDarkMode;
-    }
-
-    private readonly PaletteLight _lightPalette = new()
-    {
-        Black = "#110e2d",
-        AppbarText = "#424242",
-        AppbarBackground = "rgba(255,255,255,0.8)",
-        DrawerBackground = "#ffffff",
-        GrayLight = "#e8e8e8",
-        GrayLighter = "#f9f9f9",
-    };
-
-    private readonly PaletteDark _darkPalette = new()
-    {
-        Primary = "#7e6fff",
-        Surface = "#1e1e2d",
-        Background = "#1a1a27",
-        BackgroundGray = "#151521",
-        AppbarText = "#92929f",
-        AppbarBackground = "rgba(26,26,39,0.8)",
-        DrawerBackground = "#1a1a27",
-        ActionDefault = "#74718e",
-        ActionDisabled = "#9999994d",
-        ActionDisabledBackground = "#605f6d4d",
-        TextPrimary = "#b2b0bf",
-        TextSecondary = "#92929f",
-        TextDisabled = "#ffffff33",
-        DrawerIcon = "#92929f",
-        DrawerText = "#92929f",
-        GrayLight = "#2a2833",
-        GrayLighter = "#1e1e2d",
-        Info = "#4a86ff",
-        Success = "#3dcb6c",
-        Warning = "#ffb545",
-        Error = "#ff3f5f",
-        LinesDefault = "#33323e",
-        TableLines = "#33323e",
-        Divider = "#292838",
-        OverlayLight = "#1e1e2d80",
-    };
-
-    public string DarkLightModeButtonIcon => _isDarkMode switch
-    {
-        true => Icons.Material.Rounded.AutoMode,
-        false => Icons.Material.Outlined.DarkMode,
-    };
 }
-
-

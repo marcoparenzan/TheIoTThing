@@ -1,27 +1,155 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @using Microsoft.JSInterop
-@using WorkspaceLib
-@using WorkspaceLib.Models
+@implements IDisposable
 
 @inject FlowUILib.FlowUIInterop flowUI
 
-<div id="@ElName" style="height: 640px; width: 1280px;"></div>
+<div id="@ElName" class="flow-editor-root flex flex-col bg-gray-900 text-gray-100 border border-gray-700 rounded-lg overflow-hidden" style="height:@Height;width:@Width;">
+
+    <!-- Toolbar -->
+    <div class="flex items-center bg-gray-800 border-b border-gray-700 px-4 py-2 gap-2 shrink-0">
+        <div class="flex items-center gap-1 mr-4">
+            <span class="text-lg font-bold text-blue-400">⬡</span>
+            <span class="text-sm font-bold tracking-wide text-gray-200">Flow Editor</span>
+        </div>
+        <div class="h-5 w-px bg-gray-600 mx-1"></div>
+        <button type="button" data-action="new" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="New (Ctrl+N)">📄 New</button>
+        <button type="button" data-action="open" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Open (Ctrl+O)">📂 Open</button>
+        <button type="button" data-action="save" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Save (Ctrl+S)">💾 Save</button>
+        <div class="h-5 w-px bg-gray-600 mx-1"></div>
+        <button type="button" data-action="zoom-in" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom In">🔍+</button>
+        <button type="button" data-action="zoom-out" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom Out">🔍−</button>
+        <button type="button" data-action="zoom-reset" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom Reset">↺ 100%</button>
+        <span data-role="zoom-display" class="text-xs text-gray-400 ml-1 tabular-nums">100%</span>
+        <div class="flex-1"></div>
+        <span data-role="flow-name" class="text-xs text-gray-500 italic">Untitled Flow</span>
+    </div>
+
+    <!-- Main layout -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Palette -->
+        <div class="w-56 bg-gray-950 border-r border-gray-700 flex flex-col shrink-0 overflow-y-auto" style="background:#111827">
+            <div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700">Palette</div>
+
+            <div class="px-3 pt-3 pb-1">
+                <div class="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1.5">▸ Input</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" data-role="palette-input"></div>
+
+            <div class="px-3 pt-2 pb-1">
+                <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">▸ Process</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" data-role="palette-process"></div>
+
+            <div class="px-3 pt-2 pb-1">
+                <div class="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1.5">▸ Output</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" data-role="palette-output"></div>
+        </div>
+
+        <!-- Canvas area -->
+        <div class="flex-1 relative overflow-hidden bg-gray-900" data-role="canvas-wrapper">
+            <div class="canvas-grid absolute" data-role="canvas" style="width:6000px;height:6000px;transform-origin:0 0;">
+                <svg class="connections-svg" data-role="connections-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div data-role="blocks-container"></div>
+            </div>
+        </div>
+
+        <!-- Properties panel -->
+        <div class="w-72 bg-gray-950 border-l border-gray-700 flex flex-col shrink-0 overflow-y-auto" style="background:#111827">
+            <div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700">Properties</div>
+            <div data-role="props-empty" class="flex-1 flex items-center justify-center text-gray-600 text-xs italic p-4 text-center">
+                Select a block to view its properties
+            </div>
+            <div data-role="props-content" class="hidden flex-1 flex flex-col p-3 gap-3">
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">ID</label>
+                    <div data-role="prop-id" class="text-xs text-gray-500 font-mono mt-0.5"></div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Type</label>
+                    <div class="text-xs mt-0.5 flex items-center gap-1.5">
+                        <span data-role="prop-type-badge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Name</label>
+                    <input data-role="prop-name" type="text" class="w-full mt-1 px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100" />
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Color</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <input data-role="prop-color" type="color" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
+                        <span data-role="prop-color-hex" class="text-xs text-gray-400 font-mono"></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Position</label>
+                    <div class="flex gap-2 mt-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] text-gray-500">X:</span>
+                            <span data-role="prop-x" class="text-xs text-gray-300 font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] text-gray-500">Y:</span>
+                            <span data-role="prop-y" class="text-xs text-gray-300 font-mono"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col min-h-0">
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Config (YAML)</label>
+                    <textarea data-role="prop-config" class="w-full flex-1 mt-1 px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 font-mono resize-none min-h-[120px]" spellcheck="false"></textarea>
+                    <div data-role="prop-config-error" class="text-[10px] text-red-400 mt-0.5 hidden"></div>
+                </div>
+                <button type="button" data-role="delete-block-btn" class="mt-1 px-3 py-1.5 text-xs font-medium bg-red-900/50 hover:bg-red-800/60 text-red-300 rounded transition flex items-center justify-center gap-1">
+                    🗑 Remove block
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" data-role="file-input" accept=".json" class="hidden" />
+</div>
 
 @code {
 
     [Parameter]
-    public string State { get; set; }
+    public string? State { get; set; }
 
     [Parameter]
-    public string Name { get; set; }
+    public string Name { get; set; } = "flow";
+
+    [Parameter]
+    public string Height { get; set; } = "720px";
+
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    [Parameter]
+    public EventCallback<string> OnSave { get; set; }
 
     string ElName => $"{Name}-el";
+
+    DotNetObjectReference<FlowCanvas>? selfRef;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await flowUI.InitFlowAsync(Name, ElName);
+            selfRef = DotNetObjectReference.Create(this);
+            await flowUI.InitFlowAsync(Name, ElName, State, selfRef);
         }
+    }
+
+    [JSInvokable]
+    public async Task NotifySaveRequested(string json)
+    {
+        await OnSave.InvokeAsync(json);
+    }
+
+    public void Dispose()
+    {
+        selfRef?.Dispose();
     }
 }

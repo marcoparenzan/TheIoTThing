@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
@@ -11,23 +11,19 @@
 		<PackageReference Include="Azure.Storage.Files.DataLake" Version="12.22.0" />
 		<PackageReference Include="BlazorMonaco" Version="3.3.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.3" />
-		<PackageReference Include="MudBlazor" Version="7.*" />
-		<PackageReference Include="Extensions.MudBlazor.StaticInput" Version="2.*" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.3" />
 		<PackageReference Include="Microsoft.Identity.Web" Version="3.8.2" />
 		<PackageReference Include="Microsoft.Identity.Web.UI" Version="3.8.2" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\BlocklyLib\BlocklyLib.csproj" />
-	  <ProjectReference Include="..\FlowUILib\FlowUILib.csproj" />
-	  <ProjectReference Include="..\MqttLib\MqttLib.csproj" />
-	  <ProjectReference Include="..\OpcUaLib\OpcUaLib.csproj" />
-	  <ProjectReference Include="..\RoslynLib\RoslynLib.csproj" />
-	  <ProjectReference Include="..\WorkspaceLib\WorkspaceLib.csproj" />
+	  <!-- Deliberately no ProjectReference to TheFlowThing/TheCounterThing/FlowUILib (or their
+	       Abstractions) — every service-type plugin is loaded at runtime from plugins.json via
+	       PluginLoader, never referenced at compile time. Only TheIoTThing.Abstractions (the shared
+	       contract) remains. -->
+	  <ProjectReference Include="..\TheIoTThing.Abstractions\TheIoTThing.Abstractions.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

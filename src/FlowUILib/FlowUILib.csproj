@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -16,8 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlowLib\FlowLib.csproj" />
-    <ProjectReference Include="..\WorkspaceLib\WorkspaceLib.csproj" />
+    <ProjectReference Include="..\TheFlowThing\TheFlowThing.csproj" />
   </ItemGroup>
 
 </Project>

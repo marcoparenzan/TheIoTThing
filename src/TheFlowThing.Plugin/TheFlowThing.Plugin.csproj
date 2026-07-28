@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Loaded at runtime via AssemblyLoadContext + AssemblyDependencyResolver (see
+         TheIoTThingsApp/Services/PluginLoader.cs), which needs this project's own .deps.json to
+         resolve its private dependencies (Jint, YamlDotNet, PySharp.Interpreter, TheFlowThing,
+         FlowUILib) from its build output folder — not generated for class libraries by default. -->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <!-- Class libraries don't copy their full transitive dependency closure (NuGet packages, other
+         ProjectReferences) to their own output by default — only executables do. A plugin folder
+         needs every one of its dependencies physically present alongside it. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheFlowThing\TheFlowThing.csproj" />
+    <ProjectReference Include="..\FlowUILib\FlowUILib.csproj" />
+    <ProjectReference Include="..\TheIoTThing.Abstractions\TheIoTThing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

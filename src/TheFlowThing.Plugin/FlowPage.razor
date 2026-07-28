@@ -1,0 +1,71 @@
+@page "/flow/{FlowName}"
+@using TheFlowThing.Editor
+@using TheIoTThing.Abstractions
+@inject IJSRuntime jsRuntime
+@inject IOrchestratorAccess orchestrator
+@rendermode InteractiveServer
+
+<PageTitle>Flow — @FlowName</PageTitle>
+<article class="p-4 h-full flex flex-col gap-3">
+    @if (service is not null)
+    {
+        <div class="flex items-center gap-3 shrink-0">
+            <span class="text-sm text-gray-200 font-mono">@FlowName</span>
+            <span class="text-xs text-gray-400">Status:</span>
+            <span class="px-2 py-0.5 rounded text-xs font-bold uppercase @StatusBadgeClass">@service.Status</span>
+            @if (service.Status == ServiceStatus.Running)
+            {
+                <button type="button" @onclick="EnterEditMode" class="px-3 py-1.5 text-xs font-medium bg-yellow-700 hover:bg-yellow-600 rounded transition">✏️ Edit (pauses the flow)</button>
+            }
+        </div>
+
+        @if (currentFlowJson is not null)
+        {
+            <FlowCanvas Name="@FlowName" Height="calc(100vh - 9rem)" State="@currentFlowJson" OnSave="HandleSave"></FlowCanvas>
+        }
+    }
+</article>
+
+
+@code {
+    [Parameter]
+    public string FlowName { get; set; } = "";
+
+    string? loadedFlowName;
+    IOrchestratedService? service;
+    string? currentFlowJson;
+    string? flowFilePath;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (FlowName == loadedFlowName) return;
+        loadedFlowName = FlowName;
+
+        service = await orchestrator.GetOrCreateAsync(FlowName);
+        flowFilePath = ServiceStore.Resolve(FlowName);
+        var flowDefJson = await File.ReadAllTextAsync(flowFilePath);
+        currentFlowJson = EditorFlowConverter.ToEditorJson(flowDefJson);
+    }
+
+    string StatusBadgeClass => service!.Status switch
+    {
+        ServiceStatus.Running => "bg-green-900/50 text-green-300",
+        ServiceStatus.Paused => "bg-yellow-900/50 text-yellow-300",
+        _ => "bg-gray-700 text-gray-300"
+    };
+
+    async Task EnterEditMode()
+    {
+        await service!.PauseAsync();
+    }
+
+    async Task HandleSave(string editorJson)
+    {
+        await service!.PauseAsync();
+        var existingFlowDefJson = await File.ReadAllTextAsync(flowFilePath!);
+        var flowDefJson = EditorFlowConverter.ToFlowDefJson(editorJson, existingFlowDefJson);
+        await File.WriteAllTextAsync(flowFilePath!, flowDefJson);
+        await orchestrator.ReloadAsync(FlowName);
+        currentFlowJson = editorJson;
+    }
+}

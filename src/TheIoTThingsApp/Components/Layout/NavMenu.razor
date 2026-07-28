@@ -1,34 +1,5 @@
-﻿@implements IDisposable
-
-@inject NavigationManager NavigationManager
-
-<MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudNavLink Href="/config" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Report">Config</MudNavLink>
-    <MudNavLink Href="/flow" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Abc">Flow</MudNavLink>
-</MudNavMenu>
-
-
-@code {
-    private string? currentUrl;
-
-    protected override void OnInitialized()
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-        NavigationManager.LocationChanged += OnLocationChanged;
-    }
-
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= OnLocationChanged;
-    }
-}
-
-
-
+<nav class="flex flex-col gap-1 p-2 text-sm">
+    <NavLink href="" Match="NavLinkMatch.All" class="flex items-center gap-2 px-3 py-2 rounded text-gray-300 hover:bg-gray-800 hover:text-white transition" ActiveClass="bg-blue-600/20 text-blue-400 font-semibold">
+        <span>🏠</span> Home
+    </NavLink>
+</nav>

@@ -1,236 +1,188 @@
-﻿@page "/"
-@using BlazorMonaco
-@using BlazorMonaco.Editor
-@using BlazorMonaco.Languages
-@inject IJSRuntime jsRuntime
+@page "/"
 @rendermode InteractiveServer
+@using TheIoTThing.Abstractions
+@using TheIoTThingsApp.Services
+@inject ServiceOrchestrator orchestrator
+@inject PluginRegistry pluginRegistry
+@inject IJSRuntime jsRuntime
+@inject NavigationManager navigationManager
+@implements IDisposable
 
 <PageTitle>Home</PageTitle>
-<article class="content px-12">
-    <button type="button" class="btn btn-primary" @onclick="LoadWorkspaceAsync">Load</button>
-    <button type="button" class="btn btn-primary" @onclick="SaveWorkspaceAsync">Save</button>
-    <button type="button" class="btn btn-primary" @onclick="TranspileWorkspace">Transpile</button>
 
-    <BlocklyLib.BlocklyCodeGen @ref="_code" Name="TEST01"></BlocklyLib.BlocklyCodeGen>
+<article class="p-4">
+    <h3 class="text-lg font-bold text-gray-200 mb-4">Services</h3>
 
+    <div class="flex items-center gap-2 mb-4 max-w-3xl">
+        <input type="text" @bind="newServiceName" @bind:event="oninput" @onkeydown="OnNewServiceKeyDown" placeholder="new-service-name" class="px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100" />
+        <select @bind="newServiceType" class="px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100">
+            @foreach (var type in pluginRegistry.Types)
+            {
+                <option value="@type">@type</option>
+            }
+        </select>
+        <button type="button" @onclick="CreateService" class="px-3 py-1.5 text-xs font-medium bg-blue-700 hover:bg-blue-600 rounded transition">+ New Service</button>
+    </div>
+
+    @if (createError is not null)
+    {
+        <div class="mb-4 px-3 py-2 text-xs bg-red-900/50 text-red-300 rounded max-w-3xl">@createError</div>
+    }
+
+    @if (services is null)
+    {
+        <p class="text-sm text-gray-400">Loading...</p>
+    }
+    else if (services.Count == 0)
+    {
+        <p class="text-sm text-gray-400">No services found in <code class="text-gray-300">@ServiceStore.ServicesDirectory</code>.</p>
+    }
+    else
+    {
+        <table class="w-full text-sm border-collapse max-w-3xl">
+            <thead>
+                <tr class="text-left text-gray-400 border-b border-gray-700">
+                    <th class="py-2 pr-4 font-semibold">Name</th>
+                    <th class="py-2 pr-4 font-semibold">Type</th>
+                    <th class="py-2 pr-4 font-semibold">Status</th>
+                    <th class="py-2 pr-4 font-semibold">Actions</th>
+                    <th class="py-2 pr-4 font-semibold">Autostart</th>
+                    <th class="py-2 pr-4 font-semibold">Edit</th>
+                    <th class="py-2 pr-4 font-semibold"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var service in services)
+                {
+                    <tr class="border-b border-gray-800">
+                        <td class="py-2 pr-4 font-mono text-gray-200">@service.Name</td>
+                        <td class="py-2 pr-4 text-gray-400">@service.Type</td>
+                        <td class="py-2 pr-4">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold uppercase @StatusBadgeClass(service.Status)">@service.Status</span>
+                        </td>
+                        <td class="py-2 pr-4">
+                            <div class="flex items-center gap-1">
+                                <button type="button" @onclick="() => Start(service.Name)" disabled="@(service.Status == ServiceStatus.Running)" class="px-2 py-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed rounded transition" title="Start">▶</button>
+                                <button type="button" @onclick="() => Pause(service.Name)" disabled="@(service.Status != ServiceStatus.Running)" class="px-2 py-1 text-xs font-medium bg-yellow-700 hover:bg-yellow-600 disabled:opacity-40 disabled:cursor-not-allowed rounded transition" title="Pause">⏸</button>
+                                <button type="button" @onclick="() => Stop(service.Name)" disabled="@(service.Status == ServiceStatus.Stopped)" class="px-2 py-1 text-xs font-medium bg-red-800 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition" title="Stop">⏹</button>
+                            </div>
+                        </td>
+                        <td class="py-2 pr-4">
+                            <input type="checkbox" checked="@service.Autostart" @onchange="e => ToggleAutostart(service.Name, e)" class="w-4 h-4" title="Start automatically when the application launches" />
+                        </td>
+                        <td class="py-2 pr-4">
+                            @{
+                                var specificRoute = pluginRegistry.TryGetEditRoute(service.Type, service.Name);
+                            }
+                            @if (specificRoute is not null)
+                            {
+                                <a href="@specificRoute" class="text-blue-400 hover:underline mr-3">Visual</a>
+                            }
+                            <a href="@($"/config/{Uri.EscapeDataString(service.Name)}")" class="text-blue-400 hover:underline">Config</a>
+                        </td>
+                        <td class="py-2 pr-4">
+                            <button type="button" @onclick="() => DeleteService(service.Name)" class="px-2 py-1 text-xs font-medium bg-red-900/50 hover:bg-red-800/60 text-red-300 rounded transition" title="Delete">🗑</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 </article>
-
-<article class="content px-12">
-
-    <StandaloneCodeEditor @ref="_editor"></StandaloneCodeEditor>
-
-</article>
-
 
 @code {
+    IReadOnlyCollection<ServiceInfo>? services;
+    Timer? refreshTimer;
+    string newServiceName = "";
+    string newServiceType = "flow";
+    string? createError;
 
-    private BlocklyLib.BlocklyCodeGen _code = null!;
-    private StandaloneCodeEditor _editor = null!;
-    private string _valueToSet = "";
-
-    public async Task LoadWorkspaceAsync()
+    protected override async Task OnInitializedAsync()
     {
-        await _code.LoadWorkspaceAsync();
+        await Refresh();
+        refreshTimer = new Timer(OnTimerTick, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
-    public async Task SaveWorkspaceAsync()
+    void OnTimerTick(object? state) => _ = InvokeAsync(async () =>
     {
-        await _code.SaveWorkspaceAsync();
+        await Refresh();
+        StateHasChanged();
+    });
+
+    async Task Refresh()
+    {
+        services = await orchestrator.GetAllAsync();
     }
 
-    public async Task TranspileWorkspace()
+    static string StatusBadgeClass(ServiceStatus status) => status switch
     {
-        var code = await _code.TranspileWorkspace();
-        await SetValueAsync(code);
+        ServiceStatus.Running => "bg-green-900/50 text-green-300",
+        ServiceStatus.Paused => "bg-yellow-900/50 text-yellow-300",
+        _ => "bg-gray-700 text-gray-300"
+    };
+
+    async Task Start(string name)
+    {
+        var service = await orchestrator.GetOrCreateAsync(name);
+        await service.StartAsync();
+        await Refresh();
     }
 
-    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    async Task Pause(string name)
     {
-        return new StandaloneEditorConstructionOptions
-            {
-                Language = "csharp",
-                GlyphMargin = true,
-                Value = "\"use strict\";\n" +
-                            "function Person(age) {\n" +
-                            "	if (age) {\n" +
-                            "		this.age = age;\n" +
-                            "	}\n" +
-                            "}\n" +
-                            "Person.prototype.getAge = function () {\n" +
-                            "	return this.age;\n" +
-                            "};\n"
-            };
+        var service = await orchestrator.GetOrCreateAsync(name);
+        await service.PauseAsync();
+        await Refresh();
     }
 
-    private async Task EditorOnDidInit()
+    async Task Stop(string name)
     {
-        await _editor.AddCommand((int)KeyMod.CtrlCmd | (int)KeyCode.KeyH, (args) =>
+        var service = await orchestrator.GetOrCreateAsync(name);
+        await service.StopAsync();
+        await Refresh();
+    }
+
+    async Task ToggleAutostart(string name, ChangeEventArgs e)
+    {
+        var value = e.Value is bool b && b;
+        await orchestrator.SetAutostartAsync(name, value);
+        await Refresh();
+    }
+
+    async Task OnNewServiceKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
         {
-            Console.WriteLine("Ctrl+H : Initial editor command is triggered.");
-        });
+            await CreateService();
+        }
+    }
 
-        var newDecorations = new ModelDeltaDecoration[]
+    async Task CreateService()
+    {
+        createError = null;
+        try
         {
-            new ModelDeltaDecoration
-            {
-                Range = new BlazorMonaco.Range(3,1,3,1),
-                Options = new ModelDecorationOptions
-                {
-                    IsWholeLine = true,
-                    ClassName = "decorationContentClass",
-                    GlyphMarginClassName = "decorationGlyphMarginClass"
-                }
-            }
-        };
-
-        decorationIds = await _editor.DeltaDecorations(null, newDecorations);
-        // You can now use 'decorationIds' to change or remove the decorations
-    }
-
-    private string[] decorationIds = new string[0];
-
-    private void OnContextMenu(EditorMouseEvent eventArg)
-    {
-        Console.WriteLine("OnContextMenu : " + System.Text.Json.JsonSerializer.Serialize(eventArg));
-    }
-
-    private async Task ChangeTheme(ChangeEventArgs e)
-    {
-        Console.WriteLine($"setting theme to: {e.Value?.ToString()}");
-        await BlazorMonaco.Editor.Global.SetTheme(jsRuntime, e.Value?.ToString());
-    }
-
-    private async Task SetValue()
-    {
-        Console.WriteLine($"setting value to: {_valueToSet}");
-        await SetValueAsync(_valueToSet);
-    }
-
-
-    private async Task SetValueAsync(string value)
-    {
-        Console.WriteLine($"setting value to: {value}");
-        await _editor.SetValue(value);
-    }
-
-
-    private async Task GetValue()
-    {
-        var val = await _editor.GetValue();
-        Console.WriteLine($"value is: {val}");
-    }
-
-    private async Task AddCommand()
-    {
-        await _editor.AddCommand((int)KeyMod.CtrlCmd | (int)KeyCode.Enter, (args) =>
+            var fileName = await orchestrator.CreateAsync(newServiceName, newServiceType);
+            var editRoute = pluginRegistry.TryGetEditRoute(newServiceType, fileName) ?? $"/config/{Uri.EscapeDataString(fileName)}";
+            navigationManager.NavigateTo(editRoute);
+        }
+        catch (Exception ex)
         {
-            Console.WriteLine("Ctrl+Enter : Editor command is triggered.");
-        });
+            createError = ex.Message;
+        }
     }
 
-    private async Task AddAction()
+    async Task DeleteService(string name)
     {
-        var actionDescriptor = new ActionDescriptor
-            {
-                Id = "testAction",
-                Label = "Test Action",
-                Keybindings = new int[] { (int)KeyMod.CtrlCmd | (int)KeyCode.KeyB },
-                ContextMenuGroupId = "navigation",
-                ContextMenuOrder = 1.5f,
-                Run = (editor) =>
-                {
-                    Console.WriteLine("Ctrl+B : Editor action is triggered.");
-                }
-            };
-        await _editor.AddAction(actionDescriptor);
+        var confirmed = await jsRuntime.InvokeAsync<bool>("confirm", $"Delete service '{name}'? This cannot be undone.");
+        if (!confirmed) return;
+
+        await orchestrator.DeleteAsync(name);
+        await Refresh();
     }
 
-    private async Task RegisterCodeActionProvider()
+    public void Dispose()
     {
-        // Set sample marker
-        var model = await _editor.GetModel();
-        var markers = new List<MarkerData>
-        {
-            new MarkerData
-            {
-                CodeAsObject = new MarkerCode
-                {
-                    TargetUri = "https://www.google.com",
-                    Value = "my-value"
-                },
-                Message = "Marker example",
-                Severity = MarkerSeverity.Warning,
-                StartLineNumber = 4,
-                StartColumn = 3,
-                EndLineNumber = 4,
-                EndColumn = 7
-            }
-        };
-        await BlazorMonaco.Editor.Global.SetModelMarkers(jsRuntime, model, "default", markers);
-
-        // Register quick fix for marker
-        await BlazorMonaco.Languages.Global.RegisterCodeActionProvider(jsRuntime, "csharp", (modelUri, range, context) =>
-        {
-            var codeActionList = new CodeActionList();
-            if (context.Markers.Count == 0)
-                return codeActionList;
-
-            codeActionList.Actions = new List<CodeAction>
-                    {
-                new CodeAction
-                {
-                    Title = "Fix example",
-                    Kind = "quickfix",
-                    Diagnostics = markers,
-                    Edit = new WorkspaceEdit
-                    {
-                        Edits = new List<IWorkspaceEdit>
-                        {
-                            new WorkspaceTextEdit
-                            {
-                                ResourceUri = modelUri,
-                                TextEdit = new TextEditWithInsertAsSnippet
-                                {
-                                    Range = range,
-                                    Text = "THIS"
-                                }
-                            }
-                        }
-                    },
-                    IsPreferred = true
-                }
-                    };
-            return codeActionList;
-        });
-    }
-
-    private async Task RegisterCompletionItemProvider()
-    {
-        // Register completion item to replace warning item
-        await BlazorMonaco.Languages.Global.RegisterCompletionItemProvider(jsRuntime, "csharp", (modelUri, position, context) =>
-        {
-            var completionList = new CompletionList()
-                {
-                    Suggestions = new List<CompletionItem>
-                        {
-                    new CompletionItem
-                    {
-                        LabelAsString = "Replace by THIS",
-                        Kind = CompletionItemKind.Variable,
-                        Detail = "this -> THIS",
-                        InsertText = "THIS",
-                        Preselect = true,
-                        RangeAsObject = new BlazorMonaco.Range
-                        {
-                            StartLineNumber = 4,
-                            StartColumn = 3,
-                            EndLineNumber = 4,
-                            EndColumn = 7
-                        }
-                    }
-                        }
-                };
-            return completionList;
-        });
+        refreshTimer?.Dispose();
     }
 }

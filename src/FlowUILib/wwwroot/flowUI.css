@@ -1,0 +1,91 @@
+/* Flow editor styles. Kept as a plain (non CSS-isolated) stylesheet because the
+   flow editor JS creates blocks/connectors/paths imperatively via the DOM, and
+   Blazor's scoped-CSS attribute is only applied to elements rendered by Razor. */
+
+.flow-editor-root {
+    --fe-grid-size: 20px;
+}
+
+.flow-editor-root .canvas-grid {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.flow-editor-root .connector {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid #94a3b8;
+    background: #1e293b;
+    cursor: crosshair;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    transition: background 0.15s, border-color 0.15s;
+}
+.flow-editor-root .connector:hover {
+    background: #3b82f6;
+    border-color: #60a5fa;
+}
+.flow-editor-root .connector-in { left: -7px; }
+.flow-editor-root .connector-out { right: -7px; }
+
+.flow-editor-root .flow-block {
+    position: absolute;
+    min-width: 140px;
+    border-radius: 10px;
+    padding: 12px 18px;
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    border: 2px solid transparent;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    z-index: 5;
+}
+.flow-editor-root .flow-block:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.5); }
+.flow-editor-root .flow-block.selected { border-color: #facc15 !important; box-shadow: 0 0 0 3px rgba(250,204,21,0.3); }
+.flow-editor-root .flow-block.dragging { cursor: grabbing; opacity: 0.85; z-index: 20; }
+
+.flow-editor-root .connections-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 2;
+}
+.flow-editor-root .connections-svg path {
+    pointer-events: stroke;
+    cursor: pointer;
+}
+.flow-editor-root .connections-svg path:hover { stroke-width: 4; }
+.flow-editor-root .connections-svg path.selected { stroke: #facc15 !important; stroke-width: 4; }
+
+.flow-editor-root .palette-item {
+    cursor: grab;
+    transition: background 0.15s, transform 0.1s;
+}
+.flow-editor-root .palette-item:hover { transform: translateX(4px); }
+.flow-editor-root .palette-item:active { cursor: grabbing; }
+
+.flow-editor-root .drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.8;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.flow-editor-root .temp-conn {
+    pointer-events: none;
+    z-index: 100;
+}
+
+.flow-editor-root ::-webkit-scrollbar { width: 6px; }
+.flow-editor-root ::-webkit-scrollbar-track { background: #1e293b; }
+.flow-editor-root ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }

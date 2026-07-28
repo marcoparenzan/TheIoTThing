@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Loaded at runtime via AssemblyLoadContext + AssemblyDependencyResolver (see
+         TheIoTThingsApp/Services/PluginLoader.cs) — needs its own .deps.json plus every dependency
+         physically copied alongside it (class libraries don't do this by default). -->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheIoTThing.Abstractions\TheIoTThing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,232 +1,120 @@
-﻿@page "/config"
-@using BlazorMonaco
+@page "/config/{ServiceName}"
 @using BlazorMonaco.Editor
-@using BlazorMonaco.Languages
-@inject IJSRuntime jsRuntime
+@using TheIoTThing.Abstractions
+@using TheIoTThingsApp.Services
+@inject ServiceOrchestrator orchestrator
 @rendermode InteractiveServer
 
-<article class="content px-4">
-    <h3>Config</h3>
+<PageTitle>Config — @ServiceName</PageTitle>
 
-    <div>
-        <div style="margin:5px 0;">
-            Theme:
-            <select @onchange="ChangeTheme">
-                <option value="vs">Visual Studio</option>
-                <option value="vs-dark">Visual Studio Dark</option>
-                <option value="hc-black">High Contrast Black</option>
-            </select>
-        </div>
-        <div style="margin:5px 0;">
-            New Value: <input type="text" @bind="_valueToSet" style="width: 400px;" /> <button @onclick="SetValue">Set Value</button>
-        </div>
-        <div style="margin:5px 0;">
-            <button @onclick="GetValue">Get Value</button>
-        </div>
-        <div style="margin:5px 0;">
-            <button @onclick="AddCommand">Add Command</button> <span style="font-size:10px">Ctrl+Enter to trigger the command.</span>
-        </div>
-        <div style="margin:5px 0;">
-            <button @onclick="AddAction">Add Action</button> <span style="font-size:10px">Ctrl+B to trigger the action.</span>
-        </div>
-        <div style="margin:5px 0;">
-            <button @onclick="RegisterCodeActionProvider">RegisterCodeActionProvider</button> <span style="font-size:10px">Hover over the "this" on line:4</span>
-        </div>
-        <div style="margin:5px 0;">
-            <button @onclick="RegisterCompletionItemProvider">RegisterCompletionItemProvider</button> <span style="font-size:10px">Ctrl+Space on the "this" on line:4</span>
-        </div>
-        <div style="margin:5px 0;">
-            See the console for the button results.
-        </div>
-    </div>
+<article class="h-full flex flex-col p-4 text-gray-100">
+    <h3 class="text-lg font-bold text-gray-200 mb-4 shrink-0">Config — @ServiceName</h3>
 
-    <StandaloneCodeEditor @ref="_editor" />
+    @if (service is not null)
+    {
+        <div class="flex items-center gap-3 mb-4 shrink-0">
+            <span class="text-xs text-gray-400">Status:</span>
+            <span class="px-2 py-0.5 rounded text-xs font-bold uppercase @StatusBadgeClass">@service.Status</span>
+            @if (service.Status == ServiceStatus.Running)
+            {
+                <button type="button" @onclick="EnterEditMode" class="px-3 py-1.5 text-xs font-medium bg-yellow-700 hover:bg-yellow-600 rounded transition">✏️ Edit (pauses the service)</button>
+            }
+            <button type="button" @onclick="Save" class="px-3 py-1.5 text-xs font-medium bg-blue-700 hover:bg-blue-600 rounded transition">💾 Save</button>
+        </div>
+    }
 
+    @if (errorMessage is not null)
+    {
+        <div class="mb-3 px-3 py-2 text-xs bg-red-900/50 text-red-300 rounded shrink-0">@errorMessage</div>
+    }
+
+    @if (initialYaml is not null)
+    {
+        <div class="flex-1 min-h-0 border border-gray-700 rounded-lg overflow-hidden">
+            <StandaloneCodeEditor @ref="_editor" ConstructionOptions="EditorConstructionOptions" CssClass="h-full" />
+        </div>
+    }
 </article>
 
 @code {
+    [Parameter]
+    public string ServiceName { get; set; } = "";
+
     private StandaloneCodeEditor _editor = null!;
-    private string _valueToSet = "";
+    private string? loadedServiceName;
+    private IOrchestratedService? service;
+    private string? initialYaml;
+    private string? configFilePath;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ServiceName == loadedServiceName) return;
+        loadedServiceName = ServiceName;
+
+        service = await orchestrator.GetOrCreateAsync(ServiceName);
+        configFilePath = ServiceStore.Resolve(ServiceName);
+        var configJson = await File.ReadAllTextAsync(configFilePath);
+        initialYaml = FlowYamlConverter.ToYaml(configJson);
+        errorMessage = null;
+
+        if (_editor is not null)
+        {
+            await _editor.SetValue(initialYaml);
+        }
+    }
+
+    string StatusBadgeClass => service!.Status switch
+    {
+        ServiceStatus.Running => "bg-green-900/50 text-green-300",
+        ServiceStatus.Paused => "bg-yellow-900/50 text-yellow-300",
+        _ => "bg-gray-700 text-gray-300"
+    };
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
         return new StandaloneEditorConstructionOptions
-            {
-                Language = "csharp",
-                GlyphMargin = true,
-                Value = "\"use strict\";\n" +
-                        "function Person(age) {\n" +
-                        "	if (age) {\n" +
-                        "		this.age = age;\n" +
-                        "	}\n" +
-                        "}\n" +
-                        "Person.prototype.getAge = function () {\n" +
-                        "	return this.age;\n" +
-                        "};\n"
-            };
-    }
-
-    private async Task EditorOnDidInit()
-    {
-        await _editor.AddCommand((int)KeyMod.CtrlCmd | (int)KeyCode.KeyH, (args) =>
         {
-            Console.WriteLine("Ctrl+H : Initial editor command is triggered.");
-        });
-
-        var newDecorations = new ModelDeltaDecoration[]
-        {
-            new ModelDeltaDecoration
-            {
-                Range = new BlazorMonaco.Range(3,1,3,1),
-                Options = new ModelDecorationOptions
-                {
-                    IsWholeLine = true,
-                    ClassName = "decorationContentClass",
-                    GlyphMarginClassName = "decorationGlyphMarginClass"
-                }
-            }
+            AutomaticLayout = true,
+            Language = "yaml",
+            Theme = "vs-dark",
+            Value = initialYaml
         };
-
-        decorationIds = await _editor.DeltaDecorations(null, newDecorations);
-        // You can now use 'decorationIds' to change or remove the decorations
     }
 
-    private string[] decorationIds = new string[0];
-
-    private void OnContextMenu(EditorMouseEvent eventArg)
+    async Task EnterEditMode()
     {
-        Console.WriteLine("OnContextMenu : " + System.Text.Json.JsonSerializer.Serialize(eventArg));
+        await service!.PauseAsync();
     }
 
-    private async Task ChangeTheme(ChangeEventArgs e)
+    async Task Save()
     {
-        Console.WriteLine($"setting theme to: {e.Value?.ToString()}");
-        await BlazorMonaco.Editor.Global.SetTheme(jsRuntime, e.Value?.ToString());
-    }
+        errorMessage = null;
+        var yaml = await _editor.GetValue();
 
-    private async Task SetValue()
-    {
-        Console.WriteLine($"setting value to: {_valueToSet}");
-        await _editor.SetValue(_valueToSet);
-    }
-
-    private async Task GetValue()
-    {
-        var val = await _editor.GetValue();
-        Console.WriteLine($"value is: {val}");
-    }
-
-    private async Task AddCommand()
-    {
-        await _editor.AddCommand((int)KeyMod.CtrlCmd | (int)KeyCode.Enter, (args) =>
+        string configJson;
+        try
         {
-            Console.WriteLine("Ctrl+Enter : Editor command is triggered.");
-        });
-    }
-
-    private async Task AddAction()
-    {
-        var actionDescriptor = new ActionDescriptor
-            {
-                Id = "testAction",
-                Label = "Test Action",
-                Keybindings = new int[] { (int)KeyMod.CtrlCmd | (int)KeyCode.KeyB },
-                ContextMenuGroupId = "navigation",
-                ContextMenuOrder = 1.5f,
-                Run = (editor) =>
-                {
-                    Console.WriteLine("Ctrl+B : Editor action is triggered.");
-                }
-            };
-        await _editor.AddAction(actionDescriptor);
-    }
-
-    private async Task RegisterCodeActionProvider()
-    {
-        // Set sample marker
-        var model = await _editor.GetModel();
-        var markers = new List<MarkerData>
+            configJson = FlowYamlConverter.ToJson(yaml);
+        }
+        catch (FlowYamlException ex)
         {
-            new MarkerData
-            {
-                CodeAsObject = new MarkerCode
-                {
-                    TargetUri = "https://www.google.com",
-                    Value = "my-value"
-                },
-                Message = "Marker example",
-                Severity = MarkerSeverity.Warning,
-                StartLineNumber = 4,
-                StartColumn = 3,
-                EndLineNumber = 4,
-                EndColumn = 7
-            }
-        };
-        await BlazorMonaco.Editor.Global.SetModelMarkers(jsRuntime, model, "default", markers);
+            errorMessage = ex.Message;
+            return;
+        }
 
-        // Register quick fix for marker
-        await BlazorMonaco.Languages.Global.RegisterCodeActionProvider(jsRuntime, "csharp", (modelUri, range, context) =>
+        // Unlike the old Flow-only editor, this page serves any service type, so there's no shape to
+        // deserialize-and-validate generically here — a malformed-but-syntactically-valid config still
+        // surfaces as a load failure below (same as a bad flow file already did before this change).
+        await service!.PauseAsync();
+        await File.WriteAllTextAsync(configFilePath!, configJson);
+        try
         {
-            var codeActionList = new CodeActionList();
-            if (context.Markers.Count == 0)
-                return codeActionList;
-
-            codeActionList.Actions = new List<CodeAction>
-                {
-                new CodeAction
-                {
-                    Title = "Fix example",
-                    Kind = "quickfix",
-                    Diagnostics = markers,
-                    Edit = new WorkspaceEdit
-                    {
-                        Edits = new List<IWorkspaceEdit>
-                        {
-                            new WorkspaceTextEdit
-                            {
-                                ResourceUri = modelUri,
-                                TextEdit = new TextEditWithInsertAsSnippet
-                                {
-                                    Range = range,
-                                    Text = "THIS"
-                                }
-                            }
-                        }
-                    },
-                    IsPreferred = true
-                }
-                };
-            return codeActionList;
-        });
-    }
-
-    private async Task RegisterCompletionItemProvider()
-    {
-        // Register completion item to replace warning item
-        await BlazorMonaco.Languages.Global.RegisterCompletionItemProvider(jsRuntime, "csharp", (modelUri, position, context) =>
+            await orchestrator.ReloadAsync(ServiceName);
+        }
+        catch (Exception ex)
         {
-            var completionList = new CompletionList()
-                {
-                    Suggestions = new List<CompletionItem>
-                    {
-                    new CompletionItem
-                    {
-                        LabelAsString = "Replace by THIS",
-                        Kind = CompletionItemKind.Variable,
-                        Detail = "this -> THIS",
-                        InsertText = "THIS",
-                        Preselect = true,
-                        RangeAsObject = new BlazorMonaco.Range
-                        {
-                            StartLineNumber = 4,
-                            StartColumn = 3,
-                            EndLineNumber = 4,
-                            EndColumn = 7
-                        }
-                    }
-                    }
-                };
-            return completionList;
-        });
+            errorMessage = $"Invalid config: {ex.Message}";
+        }
     }
 }

@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
+
+        /* Grid pattern */
+        .canvas-grid {
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Block connectors */
+        .connector {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 2px solid #94a3b8;
+            background: #1e293b;
+            cursor: crosshair;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .connector:hover {
+            background: #3b82f6;
+            border-color: #60a5fa;
+        }
+        .connector-in { left: -7px; }
+        .connector-out { right: -7px; }
+
+        /* Block styles */
+        .flow-block {
+            position: absolute;
+            min-width: 140px;
+            border-radius: 10px;
+            padding: 12px 18px;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            border: 2px solid transparent;
+            transition: box-shadow 0.15s, border-color 0.15s;
+            z-index: 5;
+        }
+        .flow-block:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.5); }
+        .flow-block.selected { border-color: #facc15 !important; box-shadow: 0 0 0 3px rgba(250,204,21,0.3); }
+        .flow-block.dragging { cursor: grabbing; opacity: 0.85; z-index: 20; }
+
+        /* SVG connections */
+        #connections-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #connections-svg path {
+            pointer-events: stroke;
+            cursor: pointer;
+        }
+        #connections-svg path:hover { stroke-width: 4; }
+        #connections-svg path.selected { stroke: #facc15 !important; stroke-width: 4; }
+
+        /* Palette items */
+        .palette-item {
+            cursor: grab;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .palette-item:hover { transform: translateX(4px); }
+        .palette-item:active { cursor: grabbing; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+        /* Drag ghost */
+        .drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.8;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        /* Temp connection line */
+        .temp-conn {
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans h-screen flex flex-col">
+
+    <!-- Toolbar -->
+    <div class="flex items-center bg-gray-800 border-b border-gray-700 px-4 py-2 gap-2 shrink-0" id="toolbar">
+        <div class="flex items-center gap-1 mr-4">
+            <span class="text-lg font-bold text-blue-400">⬡</span>
+            <span class="text-sm font-bold tracking-wide text-gray-200">Flow Editor</span>
+        </div>
+        <div class="h-5 w-px bg-gray-600 mx-1"></div>
+        <button onclick="flowNew()" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Nuovo (Ctrl+N)">📄 Nuovo</button>
+        <button onclick="flowOpen()" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Apri (Ctrl+O)">📂 Apri</button>
+        <button onclick="flowSave()" class="px-3 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Salva (Ctrl+S)">💾 Salva</button>
+        <div class="h-5 w-px bg-gray-600 mx-1"></div>
+        <button onclick="zoomIn()" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom In">🔍+</button>
+        <button onclick="zoomOut()" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom Out">🔍−</button>
+        <button onclick="zoomReset()" class="px-2 py-1.5 text-xs font-medium bg-gray-700 hover:bg-gray-600 rounded transition" title="Zoom Reset">↺ 100%</button>
+        <span id="zoom-display" class="text-xs text-gray-400 ml-1 tabular-nums">100%</span>
+        <div class="flex-1"></div>
+        <span id="flow-name" class="text-xs text-gray-500 italic">Untitled Flow</span>
+    </div>
+
+    <!-- Main layout -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Palette -->
+        <div class="w-56 bg-gray-850 border-r border-gray-700 flex flex-col shrink-0 overflow-y-auto" style="background:#111827" id="palette">
+            <div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700">Palette</div>
+
+            <!-- Input blocks -->
+            <div class="px-3 pt-3 pb-1">
+                <div class="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1.5">▸ Ingresso</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" id="palette-input"></div>
+
+            <!-- Process blocks -->
+            <div class="px-3 pt-2 pb-1">
+                <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">▸ Elaborazione</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" id="palette-process"></div>
+
+            <!-- Output blocks -->
+            <div class="px-3 pt-2 pb-1">
+                <div class="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1.5">▸ Uscita</div>
+            </div>
+            <div class="px-2 pb-2 flex flex-col gap-1" id="palette-output"></div>
+        </div>
+
+        <!-- Canvas area -->
+        <div class="flex-1 relative overflow-hidden bg-gray-900" id="canvas-wrapper">
+            <div id="canvas" class="canvas-grid absolute" style="width:6000px;height:6000px;transform-origin:0 0;">
+                <svg id="connections-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="blocks-container"></div>
+            </div>
+        </div>
+
+        <!-- Properties panel -->
+        <div class="w-72 bg-gray-850 border-l border-gray-700 flex flex-col shrink-0 overflow-y-auto" style="background:#111827" id="properties-panel">
+            <div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700">Proprietà</div>
+            <div id="props-empty" class="flex-1 flex items-center justify-center text-gray-600 text-xs italic p-4 text-center">
+                Seleziona un blocco per visualizzare le proprietà
+            </div>
+            <div id="props-content" class="hidden flex-1 flex flex-col p-3 gap-3">
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">ID</label>
+                    <div id="prop-id" class="text-xs text-gray-500 font-mono mt-0.5"></div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tipo</label>
+                    <div id="prop-type" class="text-xs mt-0.5 flex items-center gap-1.5">
+                        <span id="prop-type-badge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider" for="prop-name">Nome</label>
+                    <input id="prop-name" type="text" class="w-full mt-1 px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100" />
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider" for="prop-color">Colore</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <input id="prop-color" type="color" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
+                        <span id="prop-color-hex" class="text-xs text-gray-400 font-mono"></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Posizione</label>
+                    <div class="flex gap-2 mt-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] text-gray-500">X:</span>
+                            <span id="prop-x" class="text-xs text-gray-300 font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] text-gray-500">Y:</span>
+                            <span id="prop-y" class="text-xs text-gray-300 font-mono"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col min-h-0">
+                    <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider" for="prop-config">Config (JSON)</label>
+                    <textarea id="prop-config" class="w-full flex-1 mt-1 px-2 py-1.5 text-xs bg-gray-800 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 font-mono resize-none min-h-[120px]" spellcheck="false"></textarea>
+                    <div id="prop-config-error" class="text-[10px] text-red-400 mt-0.5 hidden"></div>
+                </div>
+                <button onclick="deleteSelected()" class="mt-1 px-3 py-1.5 text-xs font-medium bg-red-900/50 hover:bg-red-800/60 text-red-300 rounded transition flex items-center justify-center gap-1">
+                    🗑 Rimuovi blocco
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="file-input" accept=".json" class="hidden" />
+
+    <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    const state = {
+        blocks: [],
+        connections: [],
+        selectedBlockId: null,
+        selectedConnectionId: null,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        isDirty: false,
+        flowName: 'Untitled Flow',
+        nextBlockNum: 1,
+        nextConnNum: 1
+    };
+
+    // =========================================================================
+    // BLOCK DEFINITIONS
+    // =========================================================================
+    const BLOCK_DEFS = {
+        input: {
+            color: '#22c55e',
+            items: [
+                { name: 'Data Source', icon: '🗄️', config: { source: '' } },
+                { name: 'API Input', icon: '🌐', config: { url: '', method: 'GET' } },
+                { name: 'File Reader', icon: '📖', config: { path: '', format: 'csv' } },
+                { name: 'Sensor', icon: '📡', config: { sensorId: '', interval: 1000 } },
+                { name: 'Manual Input', icon: '✏️', config: { fields: [] } }
+            ]
+        },
+        process: {
+            color: '#3b82f6',
+            items: [
+                { name: 'Transform', icon: '🔄', config: { mapping: {} } },
+                { name: 'Filter', icon: '🔍', config: { condition: '' } },
+                { name: 'Aggregate', icon: '📊', config: { function: 'sum', field: '' } },
+                { name: 'Condition', icon: '🔀', config: { if: '', then: '', else: '' } },
+                { name: 'Script', icon: '📜', config: { language: 'js', code: '' } }
+            ]
+        },
+        output: {
+            color: '#f97316',
+            items: [
+                { name: 'Data Output', icon: '💾', config: { destination: '' } },
+                { name: 'API Output', icon: '📤', config: { url: '', method: 'POST' } },
+                { name: 'File Writer', icon: '📝', config: { path: '', format: 'json' } },
+                { name: 'Display', icon: '🖥️', config: { template: '' } },
+                { name: 'Notification', icon: '🔔', config: { channel: 'email', message: '' } }
+            ]
+        }
+    };
+
+    const TYPE_LABELS = { input: 'Ingresso', process: 'Elaborazione', output: 'Uscita' };
+    const GRID_SIZE = 20;
+
+    // =========================================================================
+    // DOM REFS
+    // =========================================================================
+    const $canvas = document.getElementById('canvas');
+    const $canvasWrapper = document.getElementById('canvas-wrapper');
+    const $blocksContainer = document.getElementById('blocks-container');
+    const $svg = document.getElementById('connections-svg');
+    const $zoomDisplay = document.getElementById('zoom-display');
+    const $flowName = document.getElementById('flow-name');
+    const $fileInput = document.getElementById('file-input');
+
+    // Props panel elements
+    const $propsEmpty = document.getElementById('props-empty');
+    const $propsContent = document.getElementById('props-content');
+    const $propId = document.getElementById('prop-id');
+    const $propType = document.getElementById('prop-type-badge');
+    const $propName = document.getElementById('prop-name');
+    const $propColor = document.getElementById('prop-color');
+    const $propColorHex = document.getElementById('prop-color-hex');
+    const $propX = document.getElementById('prop-x');
+    const $propY = document.getElementById('prop-y');
+    const $propConfig = document.getElementById('prop-config');
+    const $propConfigError = document.getElementById('prop-config-error');
+
+    // =========================================================================
+    // INIT PALETTE
+    // =========================================================================
+    function initPalette() {
+        for (const [type, def] of Object.entries(BLOCK_DEFS)) {
+            const container = document.getElementById(`palette-${type}`);
+            for (const item of def.items) {
+                const el = document.createElement('div');
+                el.className = 'palette-item flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-medium text-gray-200';
+                el.style.background = hexToRgba(def.color, 0.15);
+                el.style.borderLeft = `3px solid ${def.color}`;
+                el.innerHTML = `<span class="text-sm">${item.icon}</span><span>${item.name}</span>`;
+                el.draggable = true;
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('application/flow-block', JSON.stringify({ type, name: item.name, icon: item.icon, config: item.config, color: def.color }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                    // Create ghost
+                    const ghost = document.createElement('div');
+                    ghost.className = 'drag-ghost';
+                    ghost.style.background = def.color;
+                    ghost.textContent = `${item.icon} ${item.name}`;
+                    document.body.appendChild(ghost);
+                    e.dataTransfer.setDragImage(ghost, 60, 18);
+                    requestAnimationFrame(() => ghost.remove());
+                });
+                container.appendChild(el);
+            }
+        }
+    }
+
+    // =========================================================================
+    // CANVAS - DROP, PAN, ZOOM
+    // =========================================================================
+    $canvasWrapper.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    $canvasWrapper.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const raw = e.dataTransfer.getData('application/flow-block');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        const rect = $canvasWrapper.getBoundingClientRect();
+        const x = snapToGrid((e.clientX - rect.left - state.panX) / state.zoom);
+        const y = snapToGrid((e.clientY - rect.top - state.panY) / state.zoom);
+        addBlock(data.type, data.name, data.icon, x, y, data.config, data.color);
+    });
+
+    // Pan with middle mouse or right-click drag
+    let isPanning = false, panStartX = 0, panStartY = 0;
+    $canvasWrapper.addEventListener('mousedown', (e) => {
+        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+            isPanning = true;
+            panStartX = e.clientX - state.panX;
+            panStartY = e.clientY - state.panY;
+            $canvasWrapper.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+    $canvasWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
+    $canvasWrapper.addEventListener('mousedown', (e) => {
+        if (e.button === 2) {
+            isPanning = true;
+            panStartX = e.clientX - state.panX;
+            panStartY = e.clientY - state.panY;
+            $canvasWrapper.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isPanning) {
+            state.panX = e.clientX - panStartX;
+            state.panY = e.clientY - panStartY;
+            updateCanvasTransform();
+        }
+        if (isDraggingBlock) {
+            dragBlockMove(e);
+        }
+        if (isDrawingConnection) {
+            drawTempConnection(e);
+        }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if (isPanning) {
+            isPanning = false;
+            $canvasWrapper.style.cursor = '';
+        }
+        if (isDraggingBlock) {
+            dragBlockEnd(e);
+        }
+        if (isDrawingConnection) {
+            endConnection(e);
+        }
+    });
+
+    // Zoom with Ctrl + scroll
+    $canvasWrapper.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            const newZoom = Math.max(0.2, Math.min(3, state.zoom + delta));
+            // Zoom towards cursor
+            const rect = $canvasWrapper.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            state.panX = mx - (mx - state.panX) * (newZoom / state.zoom);
+            state.panY = my - (my - state.panY) * (newZoom / state.zoom);
+            state.zoom = newZoom;
+            updateCanvasTransform();
+        }
+    }, { passive: false });
+
+    function updateCanvasTransform() {
+        $canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        $zoomDisplay.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+
+    function zoomIn() {
+        state.zoom = Math.min(3, state.zoom + 0.15);
+        updateCanvasTransform();
+    }
+    function zoomOut() {
+        state.zoom = Math.max(0.2, state.zoom - 0.15);
+        updateCanvasTransform();
+    }
+    function zoomReset() {
+        state.zoom = 1;
+        state.panX = 0;
+        state.panY = 0;
+        updateCanvasTransform();
+    }
+
+    // Click on empty canvas to deselect
+    $canvasWrapper.addEventListener('mousedown', (e) => {
+        if (e.target === $canvasWrapper || e.target === $canvas || e.target === $blocksContainer) {
+            if (e.button === 0 && !e.altKey) {
+                deselectAll();
+            }
+        }
+    });
+
+    // =========================================================================
+    // BLOCKS
+    // =========================================================================
+    function addBlock(type, name, icon, x, y, config, color) {
+        const id = `block_${state.nextBlockNum++}`;
+        const block = { id, type, name, icon, x, y, config: JSON.parse(JSON.stringify(config || {})), color };
+        state.blocks.push(block);
+        state.isDirty = true;
+        renderBlock(block);
+        selectBlock(id);
+        return block;
+    }
+
+    function renderBlock(block) {
+        // Remove old if exists
+        const old = document.getElementById(block.id);
+        if (old) old.remove();
+
+        const el = document.createElement('div');
+        el.id = block.id;
+        el.className = 'flow-block';
+        el.style.left = block.x + 'px';
+        el.style.top = block.y + 'px';
+        el.style.background = hexToRgba(block.color, 0.2);
+        el.style.borderColor = hexToRgba(block.color, 0.4);
+
+        el.innerHTML = `
+            <div class="connector connector-in" data-block="${block.id}" data-dir="in"></div>
+            <div class="connector connector-out" data-block="${block.id}" data-dir="out"></div>
+            <div class="flex items-center gap-2">
+                <span class="text-lg">${block.icon}</span>
+                <div>
+                    <div class="text-xs font-bold text-gray-100 block-name">${escapeHtml(block.name)}</div>
+                    <div class="text-[10px] text-gray-400 uppercase">${TYPE_LABELS[block.type]}</div>
+                </div>
+            </div>
+        `;
+
+        if (state.selectedBlockId === block.id) el.classList.add('selected');
+
+        // Block mousedown for selection and dragging
+        el.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('connector')) return;
+            if (e.button === 0) {
+                selectBlock(block.id);
+                dragBlockStart(block.id, e);
+                e.stopPropagation();
+            }
+        });
+
+        // Connector mousedown for drawing connections
+        el.querySelectorAll('.connector').forEach(conn => {
+            conn.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    e.stopPropagation();
+                    startConnection(conn.dataset.block, conn.dataset.dir, e);
+                }
+            });
+        });
+
+        $blocksContainer.appendChild(el);
+    }
+
+    function removeBlock(id) {
+        const idx = state.blocks.findIndex(b => b.id === id);
+        if (idx === -1) return;
+        state.blocks.splice(idx, 1);
+        // Remove related connections
+        state.connections = state.connections.filter(c => c.from !== id && c.to !== id);
+        const el = document.getElementById(id);
+        if (el) el.remove();
+        if (state.selectedBlockId === id) {
+            state.selectedBlockId = null;
+            updatePropsPanel();
+        }
+        state.isDirty = true;
+        renderConnections();
+    }
+
+    // =========================================================================
+    // BLOCK DRAG ON CANVAS
+    // =========================================================================
+    let isDraggingBlock = false, dragBlockId = null, dragOffsetX = 0, dragOffsetY = 0;
+
+    function dragBlockStart(id, e) {
+        isDraggingBlock = true;
+        dragBlockId = id;
+        const block = state.blocks.find(b => b.id === id);
+        const rect = $canvasWrapper.getBoundingClientRect();
+        dragOffsetX = (e.clientX - rect.left - state.panX) / state.zoom - block.x;
+        dragOffsetY = (e.clientY - rect.top - state.panY) / state.zoom - block.y;
+        const el = document.getElementById(id);
+        if (el) el.classList.add('dragging');
+    }
+
+    function dragBlockMove(e) {
+        if (!isDraggingBlock) return;
+        const block = state.blocks.find(b => b.id === dragBlockId);
+        if (!block) return;
+        const rect = $canvasWrapper.getBoundingClientRect();
+        let nx = (e.clientX - rect.left - state.panX) / state.zoom - dragOffsetX;
+        let ny = (e.clientY - rect.top - state.panY) / state.zoom - dragOffsetY;
+        block.x = snapToGrid(Math.max(0, nx));
+        block.y = snapToGrid(Math.max(0, ny));
+        const el = document.getElementById(dragBlockId);
+        if (el) {
+            el.style.left = block.x + 'px';
+            el.style.top = block.y + 'px';
+        }
+        renderConnections();
+        updatePropsPosition(block);
+        state.isDirty = true;
+    }
+
+    function dragBlockEnd(e) {
+        if (!isDraggingBlock) return;
+        const el = document.getElementById(dragBlockId);
+        if (el) el.classList.remove('dragging');
+        isDraggingBlock = false;
+        dragBlockId = null;
+    }
+
+    // =========================================================================
+    // CONNECTIONS
+    // =========================================================================
+    let isDrawingConnection = false, connFromId = null, connFromDir = null, tempLine = null;
+
+    function startConnection(blockId, dir, e) {
+        if (dir !== 'out') return; // can only start from output
+        isDrawingConnection = true;
+        connFromId = blockId;
+        connFromDir = dir;
+        // Create temp SVG line
+        tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        tempLine.setAttribute('stroke', '#60a5fa');
+        tempLine.setAttribute('stroke-width', '2');
+        tempLine.setAttribute('fill', 'none');
+        tempLine.setAttribute('stroke-dasharray', '6 4');
+        tempLine.classList.add('temp-conn');
+        $svg.appendChild(tempLine);
+    }
+
+    function drawTempConnection(e) {
+        if (!isDrawingConnection || !tempLine) return;
+        const fromBlock = state.blocks.find(b => b.id === connFromId);
+        if (!fromBlock) return;
+        const fromEl = document.getElementById(connFromId);
+        if (!fromEl) return;
+        const fromConn = fromEl.querySelector('.connector-out');
+        const fromRect = fromConn.getBoundingClientRect();
+        const wrapperRect = $canvasWrapper.getBoundingClientRect();
+
+        const x1 = (fromRect.left + fromRect.width / 2 - wrapperRect.left - state.panX) / state.zoom;
+        const y1 = (fromRect.top + fromRect.height / 2 - wrapperRect.top - state.panY) / state.zoom;
+        const x2 = (e.clientX - wrapperRect.left - state.panX) / state.zoom;
+        const y2 = (e.clientY - wrapperRect.top - state.panY) / state.zoom;
+
+        const cpOffset = Math.abs(x2 - x1) * 0.5 + 30;
+        const d = `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2} ${y2}`;
+        tempLine.setAttribute('d', d);
+    }
+
+    function endConnection(e) {
+        if (!isDrawingConnection) return;
+        isDrawingConnection = false;
+        if (tempLine) { tempLine.remove(); tempLine = null; }
+
+        // Find if dropped on an input connector
+        const target = document.elementFromPoint(e.clientX, e.clientY);
+        if (target && target.classList.contains('connector') && target.dataset.dir === 'in') {
+            const toId = target.dataset.block;
+            if (toId !== connFromId) {
+                // Check no duplicate
+                const exists = state.connections.some(c => c.from === connFromId && c.to === toId);
+                if (!exists) {
+                    const connId = `conn_${state.nextConnNum++}`;
+                    state.connections.push({ id: connId, from: connFromId, to: toId });
+                    state.isDirty = true;
+                    renderConnections();
+                }
+            }
+        }
+        connFromId = null;
+        connFromDir = null;
+    }
+
+    function renderConnections() {
+        // Clear all paths except temp
+        $svg.querySelectorAll('path:not(.temp-conn)').forEach(p => p.remove());
+
+        for (const conn of state.connections) {
+            const fromEl = document.getElementById(conn.from);
+            const toEl = document.getElementById(conn.to);
+            if (!fromEl || !toEl) continue;
+
+            const fromConn = fromEl.querySelector('.connector-out');
+            const toConn = toEl.querySelector('.connector-in');
+
+            const x1 = fromEl.offsetLeft + fromEl.offsetWidth;
+            const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
+            const x2 = toEl.offsetLeft;
+            const y2 = toEl.offsetTop + toEl.offsetHeight / 2;
+
+            const cpOffset = Math.abs(x2 - x1) * 0.4 + 40;
+            const d = `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2} ${y2}`;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', '#64748b');
+            path.setAttribute('stroke-width', '2.5');
+            path.setAttribute('fill', 'none');
+            path.dataset.connId = conn.id;
+
+            if (state.selectedConnectionId === conn.id) {
+                path.classList.add('selected');
+            }
+
+            path.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectConnection(conn.id);
+            });
+
+            // Arrow marker
+            const arrowSize = 6;
+            const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            // We'll use a marker instead
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+
+            $svg.appendChild(path);
+        }
+
+        // Ensure arrowhead marker exists
+        if (!document.getElementById('arrowhead')) {
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+                </marker>
+                <marker id="arrowhead-selected" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#facc15" />
+                </marker>
+            `;
+            $svg.insertBefore(defs, $svg.firstChild);
+        }
+    }
+
+    function selectConnection(id) {
+        state.selectedConnectionId = id;
+        state.selectedBlockId = null;
+        deselectAllBlocks();
+        renderConnections();
+        updatePropsPanel();
+    }
+
+    // =========================================================================
+    // SELECTION
+    // =========================================================================
+    function selectBlock(id) {
+        state.selectedBlockId = id;
+        state.selectedConnectionId = null;
+        // Update visual
+        document.querySelectorAll('.flow-block').forEach(el => el.classList.remove('selected'));
+        const el = document.getElementById(id);
+        if (el) el.classList.add('selected');
+        renderConnections();
+        updatePropsPanel();
+    }
+
+    function deselectAll() {
+        state.selectedBlockId = null;
+        state.selectedConnectionId = null;
+        deselectAllBlocks();
+        renderConnections();
+        updatePropsPanel();
+    }
+
+    function deselectAllBlocks() {
+        document.querySelectorAll('.flow-block').forEach(el => el.classList.remove('selected'));
+    }
+
+    function deleteSelected() {
+        if (state.selectedBlockId) {
+            removeBlock(state.selectedBlockId);
+        } else if (state.selectedConnectionId) {
+            state.connections = state.connections.filter(c => c.id !== state.selectedConnectionId);
+            state.selectedConnectionId = null;
+            state.isDirty = true;
+            renderConnections();
+            updatePropsPanel();
+        }
+    }
+
+    // =========================================================================
+    // PROPERTIES PANEL
+    // =========================================================================
+    function updatePropsPanel() {
+        if (state.selectedBlockId) {
+            const block = state.blocks.find(b => b.id === state.selectedBlockId);
+            if (!block) return;
+            $propsEmpty.classList.add('hidden');
+            $propsContent.classList.remove('hidden');
+            $propId.textContent = block.id;
+            $propType.textContent = TYPE_LABELS[block.type];
+            $propType.style.background = hexToRgba(block.color, 0.3);
+            $propType.style.color = block.color;
+            $propName.value = block.name;
+            $propColor.value = block.color;
+            $propColorHex.textContent = block.color;
+            $propX.textContent = block.x;
+            $propY.textContent = block.y;
+            $propConfig.value = JSON.stringify(block.config, null, 2);
+            $propConfigError.classList.add('hidden');
+        } else {
+            $propsEmpty.classList.remove('hidden');
+            $propsContent.classList.add('hidden');
+        }
+    }
+
+    function updatePropsPosition(block) {
+        if (state.selectedBlockId === block.id) {
+            $propX.textContent = block.x;
+            $propY.textContent = block.y;
+        }
+    }
+
+    // Props panel event listeners
+    $propName.addEventListener('input', () => {
+        const block = state.blocks.find(b => b.id === state.selectedBlockId);
+        if (!block) return;
+        block.name = $propName.value;
+        const el = document.getElementById(block.id);
+        if (el) el.querySelector('.block-name').textContent = block.name;
+        state.isDirty = true;
+    });
+
+    $propColor.addEventListener('input', () => {
+        const block = state.blocks.find(b => b.id === state.selectedBlockId);
+        if (!block) return;
+        block.color = $propColor.value;
+        $propColorHex.textContent = block.color;
+        const el = document.getElementById(block.id);
+        if (el) {
+            el.style.background = hexToRgba(block.color, 0.2);
+            el.style.borderColor = hexToRgba(block.color, 0.4);
+        }
+        $propType.style.background = hexToRgba(block.color, 0.3);
+        $propType.style.color = block.color;
+        state.isDirty = true;
+    });
+
+    $propConfig.addEventListener('input', () => {
+        const block = state.blocks.find(b => b.id === state.selectedBlockId);
+        if (!block) return;
+        try {
+            block.config = JSON.parse($propConfig.value);
+            $propConfigError.classList.add('hidden');
+            state.isDirty = true;
+        } catch (err) {
+            $propConfigError.textContent = '⚠ JSON non valido';
+            $propConfigError.classList.remove('hidden');
+        }
+    });
+
+    // =========================================================================
+    // FILE OPERATIONS
+    // =========================================================================
+    function flowNew() {
+        if (state.isDirty) {
+            if (!confirm('Ci sono modifiche non salvate. Vuoi continuare?')) return;
+        }
+        state.blocks = [];
+        state.connections = [];
+        state.selectedBlockId = null;
+        state.selectedConnectionId = null;
+        state.isDirty = false;
+        state.flowName = 'Untitled Flow';
+        state.nextBlockNum = 1;
+        state.nextConnNum = 1;
+        state.zoom = 1;
+        state.panX = 0;
+        state.panY = 0;
+        $blocksContainer.innerHTML = '';
+        renderConnections();
+        updateCanvasTransform();
+        updatePropsPanel();
+        $flowName.textContent = state.flowName;
+    }
+
+    function flowSave() {
+        const data = {
+            name: state.flowName,
+            version: '1.0',
+            blocks: state.blocks.map(b => ({
+                id: b.id,
+                type: b.type,
+                name: b.name,
+                icon: b.icon,
+                x: b.x,
+                y: b.y,
+                config: b.config,
+                color: b.color
+            })),
+            connections: state.connections.map(c => ({
+                id: c.id,
+                from: c.from,
+                to: c.to
+            }))
+        };
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${state.flowName.replace(/\s+/g, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        state.isDirty = false;
+    }
+
+    function flowOpen() {
+        if (state.isDirty) {
+            if (!confirm('Ci sono modifiche non salvate. Vuoi continuare?')) return;
+        }
+        $fileInput.click();
+    }
+
+    $fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const data = JSON.parse(reader.result);
+                loadFlow(data);
+            } catch (err) {
+                alert('Errore nel caricamento del file: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+        $fileInput.value = '';
+    });
+
+    function loadFlow(data) {
+        state.blocks = [];
+        state.connections = [];
+        state.selectedBlockId = null;
+        state.selectedConnectionId = null;
+        $blocksContainer.innerHTML = '';
+
+        state.flowName = data.name || 'Untitled Flow';
+        $flowName.textContent = state.flowName;
+
+        let maxBlockNum = 0, maxConnNum = 0;
+
+        if (data.blocks) {
+            for (const b of data.blocks) {
+                state.blocks.push({ ...b });
+                renderBlock(b);
+                const num = parseInt(b.id.replace('block_', ''));
+                if (num > maxBlockNum) maxBlockNum = num;
+            }
+        }
+        if (data.connections) {
+            for (const c of data.connections) {
+                state.connections.push({ ...c });
+                const num = parseInt(c.id.replace('conn_', ''));
+                if (num > maxConnNum) maxConnNum = num;
+            }
+        }
+
+        state.nextBlockNum = maxBlockNum + 1;
+        state.nextConnNum = maxConnNum + 1;
+        state.isDirty = false;
+
+        renderConnections();
+        updatePropsPanel();
+    }
+
+    // =========================================================================
+    // KEYBOARD SHORTCUTS
+    // =========================================================================
+    document.addEventListener('keydown', (e) => {
+        // Delete
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            // Don't delete if focus is on an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            deleteSelected();
+        }
+        // Ctrl+N
+        if (e.ctrlKey && e.key === 'n') {
+            e.preventDefault();
+            flowNew();
+        }
+        // Ctrl+O
+        if (e.ctrlKey && e.key === 'o') {
+            e.preventDefault();
+            flowOpen();
+        }
+        // Ctrl+S
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            flowSave();
+        }
+        // Ctrl+0 reset zoom
+        if (e.ctrlKey && e.key === '0') {
+            e.preventDefault();
+            zoomReset();
+        }
+        // Escape to deselect
+        if (e.key === 'Escape') {
+            deselectAll();
+        }
+    });
+
+    // =========================================================================
+    // UTILITIES
+    // =========================================================================
+    function snapToGrid(val) {
+        return Math.round(val / GRID_SIZE) * GRID_SIZE;
+    }
+
+    function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    initPalette();
+    updateCanvasTransform();
+
+    // Warn before leaving with unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+        if (state.isDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+    </script>
+</body>
+</html>

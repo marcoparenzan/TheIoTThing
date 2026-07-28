@@ -6,8 +6,8 @@ public class FlowUIInterop : IAsyncDisposable
 {
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
-    string name;
-    string elName;
+    string? name;
+    string? elName;
 
     public FlowUIInterop(IJSRuntime jsRuntime)
     {
@@ -15,21 +15,41 @@ public class FlowUIInterop : IAsyncDisposable
             "import", "./_content/FlowUILib/flowUIInterop.js").AsTask());
     }
 
-    public async Task InitFlowAsync(string name, string elName)
+    public async Task InitFlowAsync(string name, string elName, string? state = null, object? saveCallbackRef = null)
     {
         this.name = name;
         this.elName = elName;
 
         var module = await moduleTask.Value;
-        await module.InvokeVoidAsync("initFlow", this.name, this.elName);
+        await module.InvokeVoidAsync("initFlow", this.name, this.elName, state, saveCallbackRef);
+    }
+
+    public async Task<string?> GetFlowJsonAsync()
+    {
+        if (name is null) return null;
+        var module = await moduleTask.Value;
+        return await module.InvokeAsync<string?>("getFlowJson", name);
     }
 
     public async ValueTask DisposeAsync()
     {
         if (moduleTask.IsValueCreated)
         {
-            var module = await moduleTask.Value;
-            await module.DisposeAsync();
+            try
+            {
+                var module = await moduleTask.Value;
+                if (name is not null)
+                {
+                    await module.InvokeVoidAsync("disposeFlow", name);
+                }
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already gone (tab closed, navigated away, connection dropped) — there's
+                // no client left to run the JS cleanup on, and the browser will tear down the page's JS
+                // state on its own anyway.
+            }
         }
     }
 }

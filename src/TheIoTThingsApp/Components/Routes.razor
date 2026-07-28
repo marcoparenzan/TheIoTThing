@@ -1,4 +1,7 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+@using TheIoTThingsApp.Services
+@inject PluginRegistry pluginRegistry
+
+<Router AppAssembly="typeof(Program).Assembly" AdditionalAssemblies="pluginRegistry.Assemblies">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
