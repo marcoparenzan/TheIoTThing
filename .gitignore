@@ -4,8 +4,8 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # Specific
-.claude
-.other
+.claude/
+.other/
 
 # User-specific files
 *.rsuser
